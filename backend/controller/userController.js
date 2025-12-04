@@ -58,32 +58,37 @@ export const Usersign = async (req, res) => {
 
 export const userLogin = async (req, res) => {
   const { email, password } = req.body;
+
   try {
     const loginuser = await User.findOne({ email });
-    if (!loginuser) return res.status(404).json({ message: "User not found" });
+    if (!loginuser)
+      return res.status(404).json({ message: "User not found" });
 
-    const passwordIsCorrect = await bcrypt.compare(
-      password,
-      loginuser.password
-    );
+    const passwordIsCorrect = await bcrypt.compare(password, loginuser.password);
     if (!passwordIsCorrect)
       return res.status(400).json({ message: "Invalid credentials" });
 
+    // Generate OTP inside login
+    const otp = crypto.randomInt(100000, 999999).toString();
+
+    // Save OTP in DB
     loginuser.otp = otp;
-    loginuser.otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
+    loginuser.otpExpiry = Date.now() + 5 * 60 * 1000;
     await loginuser.save();
 
+    // Generate JWT token NOW (store but restrict usage until OTP verified)
     const token = jwt.sign(
       { userId: loginuser._id, email: loginuser.email, role: loginuser.role },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
-    res.status(200).json({
-      message: "Login successful",
-      token,
-      user: loginuser
+    return res.status(200).json({
+      message: "Login successful. OTP generated.",
+      token,          // <-- RETURN TOKEN ALSO
+      email,          // <-- frontend will use this for OTP page
     });
+
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ message: "Server error" });
