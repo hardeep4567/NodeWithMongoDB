@@ -1,2 +1,0 @@
-# NodeWithMongoDB
-Node with  MongoDB
