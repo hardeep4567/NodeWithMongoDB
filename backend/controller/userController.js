@@ -2,14 +2,14 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import User from "../model/usemodel.js";
-  dotenv.config();
+dotenv.config();
 import crypto from "crypto";
 import axios from "axios";
+import nodemailer from 'nodemailer'
 
 
 
-const otp = crypto.randomInt(100000, 999999).toString();
-const apiKey = process.env.BRAVO;
+const OTP = crypto.randomInt(100000, 999999).toString();
 
 
 export const Usersign = async (req, res) => {
@@ -68,25 +68,18 @@ export const userLogin = async (req, res) => {
     if (!passwordIsCorrect)
       return res.status(400).json({ message: "Invalid credentials" });
 
-    // Generate OTP inside login
+    // Generate OTP EACH LOGIN (not using global OTP)
     const otp = crypto.randomInt(100000, 999999).toString();
+    console.log("OTP stored in DB:", otp);
 
-    // Save OTP in DB
+    // Save OTP inside user
     loginuser.otp = otp;
     loginuser.otpExpiry = Date.now() + 5 * 60 * 1000;
     await loginuser.save();
 
-    // Generate JWT token NOW (store but restrict usage until OTP verified)
-    const token = jwt.sign(
-      { userId: loginuser._id, email: loginuser.email, role: loginuser.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-
     return res.status(200).json({
-      message: "Login successful. OTP generated.",
-      token,          // <-- RETURN TOKEN ALSO
-      email,          // <-- frontend will use this for OTP page
+      message: "Login successful, OTP generated.",
+      email,
     });
 
   } catch (error) {
@@ -95,85 +88,69 @@ export const userLogin = async (req, res) => {
   }
 };
 
+
 export const sendOTPEmail = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
-    }
 
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
 
-    const response = await axios.post(
-      "https://api.brevo.com/v3/smtp/email",
-      {
-        sender: {
-          name: "Hardeep",
-          email: "singh123hardeep546@gmail.com", 
-        },
-        to: [{ email }],
-        subject: "Your OTP Code",
-        htmlContent: `
-          <html>
-            <body>
-              <h2>Hello,</h2>
-              <p>Your OTP code is:</p>
-              <h1 style="color: #007bff;">${otp}</h1>
-              <p>This OTP is valid for 10 minutes.</p>
-            </body>
-          </html>
-        `,
+    const otp = user.otp; // USE SAME OTP SAVED IN LOGIN
+    console.log("Email OTP Sent:", otp);
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
       },
-      {
-        headers: {
-          "api-key": apiKey, 
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    console.log("OTP Email sent successfully:", response.data);
-
-    return res.status(200).json({
-      message: "OTP Email sent successfully",
-      otp, 
     });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Your OTP Code",
+      html: `<h1>${otp}</h1>`
+    });
+
+    res.status(200).json({ message: "OTP sent successfully" });
 
   } catch (error) {
-    console.error("Error sending OTP email:", error.response?.data || error.message);
-    return res.status(500).json({
-      message: "Failed to send OTP email",
-      error: error.message,
-    });
+    console.error("Email error:", error);
+    res.status(500).json({ message: "Failed to send OTP" });
   }
 };
 
-export const verifyOtp = async (req,res,next)=>{
-  
-const {otp,email} =req.body
+export const verifyOtp = async (req, res) => {
   try {
-if (!otp) {
-  return res.status(400).json({message:"otp is required"})
-}
-const record = User.findOne({email})
+    const { otp, email } = req.body;
 
-if(!record.otp == otp){
- return res.status(400).json({message:"otp is wrong"})
-}
+    const user = await User.findOne({ email });
 
-res.status(200).json({message :"otp verified"})
-await User.deleteOne({otp})
-next()
-    
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
+
+    console.log("Incoming OTP:", otp);
+    console.log("DB OTP:", user.otp);
+
+    if (user.otp !== otp) {
+      return res.status(400).json({ message: "OTP is wrong" });
+    }
+
+    res.status(200).json({ message: "OTP verified successfully" });
+
+    // Remove OTP after success
+    user.otp = undefined;
+    await user.save();
+
   } catch (error) {
-    console.error("Error verify OTP :", error);
-    return res.status(500).json({
-      message: "Failed to verify OTP ",
-      error: error.message,
-    });
-    
+    res.status(500).json({ message: "Failed to verify OTP" });
   }
+};
 
-}
+
 export const  changePassword = async(req,res,next)=>{
 
   const {email,currentPassword,newPassword} =req.body

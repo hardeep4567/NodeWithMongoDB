@@ -7,6 +7,7 @@ import {
   userLogin,
   Usersign,
   verifyOtp,
+  
 } from "../controller/userController.js";
 import {
   getCategory,
@@ -30,7 +31,9 @@ router.get("/productcategory",getCategory);
 router.get("/productcategory/:id",getProductsByCategoryId);
 router.get("/product-search/",searchProduct)
 router.get("/product",getproducts)
-router.get("/verifyOtp",verifyOtp)
+router.post("/verifyOtp",verifyOtp)
 router.get("/changePassword" ,changePassword)
 router.get("/getMydetail" ,getMydetail)
 export default router;
+console.log("User routes loaded");
+
