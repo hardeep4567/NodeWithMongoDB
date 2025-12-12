@@ -206,6 +206,25 @@ try {
 }
 
 
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find()
+      .select("-password -otp -resetPasswordToken -resetPasswordExpiresAt -verificationToken -verificationTokenExpiresAt");
+
+    res.status(200).json({
+      success: true,
+      total: users.length,
+      data: users
+    });
+
+  } catch (error) {
+    console.error("Get all users error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
 // export const ForgotPassword = async(req,res)=>{
 //   const {email} =req.body
 

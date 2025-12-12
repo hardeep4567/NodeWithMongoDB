@@ -2,6 +2,7 @@ import express from "express";
 
 import {
   changePassword,
+  getAllUsers,
   getMydetail,
   sendOTPEmail,
   userLogin,
@@ -34,6 +35,7 @@ router.get("/product",getproducts)
 router.post("/verifyOtp",verifyOtp)
 router.get("/changePassword" ,changePassword)
 router.get("/getMydetail" ,getMydetail)
+router.get("/getalluser" ,getAllUsers)
 export default router;
 console.log("User routes loaded");
 
