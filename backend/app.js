@@ -33,9 +33,11 @@ const upload = multer({ storage });
 const app = express();
 
 app.use(cors({
-  origin: 'http://localhost:5173', 
-  credentials: true 
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
 // Middlewares
 app.use(cookieParser('dev'));
 app.use(express.json());
